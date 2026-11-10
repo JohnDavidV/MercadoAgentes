@@ -21,6 +21,7 @@ import java.util.List;
 import java.util.Map;
 import javax.swing.SwingUtilities;
 import mercado.gui.VendedorGui;
+import mercado.modelo.EstrategiaPrecios;
 import mercado.modelo.Oferta;
 import mercado.modelo.Pedido;
 import mercado.modelo.Producto;
@@ -99,24 +100,6 @@ public class VendedorAgent extends Agent {
         }
     }
 
-    /**
-     * Estrategia de precio: descuento por volumen y un descuento extra si
-     * hay mucho inventario del producto.
-     */
-    Oferta calcularOferta(Producto p, int cantidad) {
-        int descuento = 0;
-        if (cantidad >= 10) {
-            descuento = 10;
-        } else if (cantidad >= 5) {
-            descuento = 5;
-        }
-        if (p.getStock() >= 15) {
-            descuento += 3;
-        }
-        double precio = p.getPrecio() * (100 - descuento) / 100.0;
-        return new Oferta(precio, cantidad, descuento);
-    }
-
     // Comportamiento del protocolo Contract Net del lado del participante (una sesión)
     private class ResponderContractNet extends SSContractNetResponder {
 
@@ -145,7 +128,7 @@ public class VendedorAgent extends Agent {
                 throw new RefuseException("stock-insuficiente");
             }
 
-            Oferta oferta = calcularOferta(p, pedido.getCantidad());
+            Oferta oferta = EstrategiaPrecios.calcular(p, pedido.getCantidad());
             ACLMessage propuesta = cfp.createReply();
             propuesta.setPerformative(ACLMessage.PROPOSE);
             propuesta.setContent(oferta.aContenido());
