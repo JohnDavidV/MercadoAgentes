@@ -1,0 +1,28 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      JUNIT: junit-platform-console-standalone-1.10.2.jar
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Compile
+        run: |
+          mkdir -p out/classes out/test
+          javac -encoding UTF-8 --release 8 -cp lib/jade.jar -d out/classes $(find src -name "*.java")
+      - name: Download JUnit
+        run: curl -sSfL -o $JUNIT https://repo1.maven.org/maven2/org/junit/platform/junit-platform-console-standalone/1.10.2/$JUNIT
+      - name: Test
+        run: |
+          javac -encoding UTF-8 -cp lib/jade.jar:out/classes:$JUNIT -d out/test $(find test -name "*.java")
+          java -jar $JUNIT execute -cp lib/jade.jar:out/classes:out/test --scan-classpath --fail-if-no-tests
