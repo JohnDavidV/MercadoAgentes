@@ -1,100 +1,109 @@
 # MercadoAgentes
 
-Sistema multiagente en **Java + JADE** donde varias tiendas y compradores negocian precios de forma autónoma usando el protocolo **FIPA Contract Net**. Cada agente tiene su propia ventana Swing para ver en tiempo real lo que está haciendo.
+[![CI](https://github.com/JohnDavidV/MercadoAgentes/actions/workflows/ci.yml/badge.svg)](https://github.com/JohnDavidV/MercadoAgentes/actions/workflows/ci.yml)
 
-![Tiendas y comprador negociando](docs/img/demo.png)
+Multi-agent system in **Java + JADE** where shops and buyers negotiate prices on their own using the **FIPA Contract Net** protocol. Every agent has its own Swing window, so you can watch the negotiation happen in real time.
 
-## ¿Qué hace?
+Built for the *Multi-Agent Systems and Computational Perception* course at UNIR. The user interface is in Spanish.
 
-- Las **tiendas** (agentes vendedores) se registran en las páginas amarillas (DF) con el servicio `mercado-venta`. Cada una tiene su propio catálogo, precios y stock.
-- Los **compradores** buscan en el DF a todas las tiendas, les envían un **CFP** (call for proposals) con el producto, la cantidad y el precio máximo que están dispuestos a pagar.
-- Cada tienda responde con una **propuesta** (PROPOSE) o un **rechazo** (REFUSE) si no tiene el producto o no le alcanza el stock.
-- El comprador acepta la oferta más barata que cumpla su precio máximo y rechaza las demás.
-- La tienda ganadora confirma la venta (INFORM) y descuenta el inventario. Si entre la propuesta y la aceptación otro comprador se llevó el stock, responde **FAILURE** y el comprador **vuelve a negociar automáticamente** sin esa tienda (hasta 3 intentos).
+![Shops and a buyer negotiating](docs/img/demo.png)
 
-### Características
+## How it works
 
-| Característica | Detalle |
+- **Shops** (seller agents) register in the yellow pages (DF) under the `mercado-venta` service. Each one has its own catalog, prices and stock.
+- **Buyers** look up every shop in the DF and send a **CFP** (call for proposals) with the product, the quantity and the maximum unit price they are willing to pay.
+- Each shop answers with a **PROPOSE**, or with a **REFUSE** when it does not sell the product or does not have enough stock.
+- The buyer accepts the cheapest offer under its maximum price and rejects the rest.
+- The winning shop confirms the sale (**INFORM**) and updates its stock. If another buyer took the last units between the proposal and the acceptance, it answers **FAILURE** and the buyer **negotiates again automatically** without that shop (up to 3 attempts).
+
+### Highlights
+
+| Feature | Detail |
 | --- | --- |
-| Protocolo | FIPA Contract Net con `ContractNetInitiator` y `SSContractNetResponder` |
-| Negociaciones simultáneas | Cada tienda atiende varios compradores a la vez con `SSResponderDispatcher` |
-| Descubrimiento | Páginas amarillas (DF) con `DFService.register` y `DFService.search` |
-| Estrategia de precios | Descuento por volumen (5 % desde 5 unidades, 10 % desde 10) y 3 % extra si hay mucho inventario |
-| Tolerancia a fallos | Si la tienda ganadora no puede cumplir, se reintenta sin ella |
-| Interfaz | Una ventana Swing por agente, actualizada desde el hilo de Swing (`invokeLater`) |
-| Arranque | La plataforma se lanza desde código con `jade.core.Runtime`, no hace falta configurar argumentos |
+| Protocol | FIPA Contract Net with `ContractNetInitiator` and `SSContractNetResponder` |
+| Concurrent negotiations | Each shop serves several buyers at the same time through `SSResponderDispatcher` |
+| Service discovery | Yellow pages with `DFService.register` and `DFService.search` |
+| Pricing strategy | Volume discount (5 % from 5 units, 10 % from 10) plus 3 % when the shop has plenty of stock |
+| Fault tolerance | If the winning shop cannot deliver, the buyer retries without it |
+| UI | One Swing window per agent, always updated on the Swing thread |
+| Startup | The platform is started from code with `jade.core.Runtime`, no command-line arguments needed |
+| Tests | Pricing, stock and message encoding covered with JUnit 5, run on every push |
 
-## Protocolo
+## Protocol
 
 ```mermaid
 sequenceDiagram
-    participant C as Comprador
-    participant DF as DF (páginas amarillas)
-    participant T1 as TiendaNorte
-    participant T2 as TiendaCentro
-    participant T3 as TiendaSur
+    participant B as Buyer
+    participant DF as DF (yellow pages)
+    participant S1 as TiendaNorte
+    participant S2 as TiendaCentro
+    participant S3 as TiendaSur
 
-    C->>DF: search(mercado-venta)
-    DF-->>C: TiendaNorte, TiendaCentro, TiendaSur
-    C->>T1: CFP (Portatil, 1, max 3.000.000)
-    C->>T2: CFP
-    C->>T3: CFP
-    T1-->>C: PROPOSE 2.850.000
-    T2-->>C: PROPOSE 2.790.000
-    T3-->>C: REFUSE (producto no disponible)
-    C->>T2: ACCEPT_PROPOSAL
-    C->>T1: REJECT_PROPOSAL
-    alt hay stock
-        T2-->>C: INFORM (venta confirmada)
-    else otro comprador se lo llevó
-        T2-->>C: FAILURE (stock agotado)
-        Note over C: vuelve a negociar sin TiendaCentro
+    B->>DF: search(mercado-venta)
+    DF-->>B: TiendaNorte, TiendaCentro, TiendaSur
+    B->>S1: CFP (laptop, 1, max 3,000,000)
+    B->>S2: CFP
+    B->>S3: CFP
+    S1-->>B: PROPOSE 2,850,000
+    S2-->>B: PROPOSE 2,790,000
+    S3-->>B: REFUSE (product not available)
+    B->>S2: ACCEPT_PROPOSAL
+    B->>S1: REJECT_PROPOSAL
+    alt stock available
+        S2-->>B: INFORM (sale confirmed)
+    else another buyer took it
+        S2-->>B: FAILURE (out of stock)
+        Note over B: negotiates again without TiendaCentro
     end
 ```
 
-## Capturas
+## Screenshots
 
-**Reintento automático:** Ana y Luis piden el último portátil de TiendaCentro al mismo tiempo. Luis se lo lleva, TiendaCentro le responde FAILURE a Ana y ella vuelve a negociar y compra en TiendaNorte.
+**Automatic retry:** Ana and Luis ask for the last laptop at TiendaCentro at the same time. Luis gets it, TiendaCentro answers FAILURE to Ana, and she negotiates again and buys at TiendaNorte.
 
-![Comprador Ana con reintento](docs/img/comprador_ana.png)
+![Buyer Ana retrying](docs/img/comprador_ana.png)
 
-**Sniffer de JADE** mostrando los mensajes de la negociación (CFP, PROPOSE, REFUSE, REJECT_PROPOSAL...) entre los compradores y las tiendas:
+**JADE Sniffer** showing the negotiation messages (CFP, PROPOSE, REFUSE, REJECT_PROPOSAL...) between buyers and shops:
 
 ![Sniffer](docs/img/sniffer.png)
 
-## Estructura
+## Project structure
 
 ```
 src/mercado
-├── Main.java                 arranca la plataforma y crea los agentes
+├── Main.java                   starts the platform and creates the agents
 ├── agentes
-│   ├── VendedorAgent.java    tienda: DF + Contract Net (participante)
-│   └── CompradorAgent.java   comprador: búsqueda en DF + Contract Net (iniciador)
+│   ├── VendedorAgent.java      shop: DF registration + Contract Net participant
+│   └── CompradorAgent.java     buyer: DF search + Contract Net initiator with retries
 ├── gui
-│   ├── VendedorGui.java      catálogo, ventas y log de la tienda
-│   ├── CompradorGui.java     pedido, ofertas, historial y log del comprador
-│   └── Estilo.java           colores, look and feel y posición de ventanas
+│   ├── VendedorGui.java        catalog, sales and activity log of a shop
+│   ├── CompradorGui.java       order form, offers, purchase history and log
+│   └── Estilo.java             colors, look and feel, window placement
 ├── modelo
 │   ├── Producto.java
-│   ├── Pedido.java           contenido del CFP
-│   └── Oferta.java           contenido del PROPOSE e INFORM
+│   ├── Pedido.java             CFP content
+│   ├── Oferta.java             PROPOSE and INFORM content
+│   └── EstrategiaPrecios.java  discount rules
 └── util
-    ├── Catalogos.java        catálogos de ejemplo de cada tienda
-    ├── Contenido.java        formato clave=valor del contenido de los mensajes
-    └── Formato.java          pesos colombianos y hora
+    ├── Catalogos.java          sample catalog of each shop
+    ├── Contenido.java          key=value encoding of the message content
+    └── Formato.java            Colombian pesos and timestamps
+test/mercado                    JUnit 5 tests
 ```
 
-## Cómo ejecutarlo
+## Running it
 
-Requisitos: **JDK 8 o superior**. JADE 4.6.0 ya viene incluido en `lib/jade.jar`.
+Requirements: **JDK 8 or newer**. JADE 4.6.0 is already included in `lib/jade.jar`.
 
-### Con NetBeans
+### NetBeans
 
-1. File > Open Project > seleccionar la carpeta `MercadoAgentes`.
-2. Run (F6). Se abren el RMA de JADE, las tres tiendas y los compradores Ana y Luis.
-3. En la ventana de un comprador elige el producto, la cantidad y el precio máximo, y presiona **Comprar**.
+1. File > Open Project and pick the `MercadoAgentes` folder.
+2. Run (F6). The JADE RMA, three shops and two buyers (Ana and Luis) open.
+3. In a buyer window choose a product, quantity and maximum price, then press **Comprar**.
 
-### Desde la consola (Windows)
+### Command line
+
+Windows (PowerShell):
 
 ```powershell
 mkdir build\classes
@@ -102,31 +111,47 @@ javac -encoding UTF-8 -cp lib\jade.jar -d build\classes (Get-ChildItem -Recurse 
 java -cp "lib\jade.jar;build\classes" mercado.Main
 ```
 
-En Linux o macOS se cambia `;` por `:` en el classpath. Si el puerto 1099 está ocupado por otra plataforma JADE se puede pasar otro puerto: `mercado.Main 1100`.
+Linux / macOS:
 
-### Ideas para probar
+```bash
+mkdir -p build/classes
+javac -encoding UTF-8 -cp lib/jade.jar -d build/classes $(find src -name "*.java")
+java -cp lib/jade.jar:build/classes mercado.Main
+```
 
-- Pedir 2 **Audifonos** con precio máximo 100.000: las tiendas ofertan, pero todas superan el máximo.
-- Pedir 12 **Mouse** con precio máximo 50.000: aplica el descuento por volumen.
-- Pedir 1 **Portatil** desde Ana y Luis casi al mismo tiempo: solo TiendaCentro tiene uno a 2.790.000, así que uno de los dos recibe FAILURE y reintenta.
-- Desde el RMA abrir **Tools > Start Sniffer** para ver los mensajes, o agregar productos nuevos desde la ventana de una tienda.
+If port 1099 is already used by another JADE platform, pass a different one: `mercado.Main 1100`.
 
-## Posibles mejoras
+### Things to try
 
-- Usar una ontología de JADE en lugar del formato clave=valor del contenido.
-- Negociación en varias rondas (contraofertas) y no solo una propuesta por tienda.
-- Guardar el catálogo y las ventas en una base de datos.
+- 2 **Audifonos** with a max price of 100,000: shops make offers, but all of them are above the limit.
+- 12 **Mouse** with a max price of 50,000: the volume discount kicks in.
+- 1 **Portatil** from Ana and Luis almost at the same time: only TiendaCentro has one at 2,790,000, so one of them gets FAILURE and retries.
+- From the RMA open **Tools > Start Sniffer** to see the messages, or add new products from a shop window.
 
-## Tecnologías
+## Tests
 
-Java 8+, JADE 4.6.0, Swing, NetBeans (proyecto Ant).
+The CI workflow compiles the project and runs the JUnit 5 tests in `test/` (pricing strategy, stock updates and message encoding). To run them locally with the JUnit console launcher (`junit-platform-console-standalone-1.10.2.jar` from Maven Central):
 
-## Autor
+```bash
+javac -encoding UTF-8 -cp lib/jade.jar -d out/classes $(find src -name "*.java")
+javac -encoding UTF-8 -cp lib/jade.jar:out/classes:junit-platform-console-standalone-1.10.2.jar -d out/test $(find test -name "*.java")
+java -jar junit-platform-console-standalone-1.10.2.jar execute -cp lib/jade.jar:out/classes:out/test --scan-classpath
+```
 
-**John David Vásquez Serna**. Proyecto hecho mientras cursaba Sistemas Multiagente y Percepción Computacional en UNIR.
+## Possible improvements
 
-[github.com/JohnDavidV](https://github.com/JohnDavidV)
+- Use a JADE ontology instead of the key=value message content.
+- Multi-round negotiation with counter-offers.
+- Persist catalogs and sales in a database.
 
-## Licencia
+## Tech
 
-Código bajo licencia MIT. JADE se distribuye bajo licencia LGPL (Telecom Italia), ver [jade.tilab.com](http://jade.tilab.com).
+Java 8+, JADE 4.6.0, Swing, JUnit 5, NetBeans (Ant project), GitHub Actions.
+
+## Author
+
+**John David Vásquez Serna** · [GitHub](https://github.com/JohnDavidV) · [LinkedIn](https://www.linkedin.com/in/david-v%C3%A1squez-serna-380867259)
+
+## License
+
+Code released under the MIT license. JADE is distributed by Telecom Italia under the LGPL, see [jade.tilab.com](http://jade.tilab.com).
