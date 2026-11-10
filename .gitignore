@@ -1,0 +1,17 @@
+# Compilados de NetBeans / Ant
+build/
+dist/
+
+# Configuración local de NetBeans
+nbproject/private/
+
+# Archivos que genera JADE al ejecutar
+APDescription.txt
+MTPs-Main-Container.txt
+
+# Sistema operativo e IDE
+*.class
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
